@@ -1,0 +1,26 @@
+universe:
+  selection_size: 10
+  min_listing_days: 90
+  min_avg_dollar_volume: 5000000
+data:
+  provider: local_csv
+  csv_dir: local_data
+  start_date: "2021-01-01"
+  end_date: "2024-12-31"
+strategy:
+  momentum_lookback: 20
+  reversal_lookback: 3
+  momentum_weight: 1.0
+  reversal_weight: 1.0
+portfolio:
+  long_n: 5
+  short_n: 5
+  gross_exposure: 1.0
+  net_exposure: 0.0
+  max_abs_weight: 0.2
+  turnover_limit: 0.40
+  rebalance_frequency: weekly_monday
+backtest:
+  one_way_cost_bps: 10
+  benchmark_symbol: BTC
+  output_dir: artifacts/phase1
