@@ -1,26 +1,57 @@
-universe:
-  selection_size: 10
-  min_listing_days: 90
-  min_avg_dollar_volume: 5000000
 data:
   provider: local_csv
   csv_dir: local_data
   start_date: "2021-01-01"
   end_date: "2024-12-31"
-strategy:
-  momentum_lookback: 20
-  reversal_lookback: 3
-  momentum_weight: 1.0
-  reversal_weight: 1.0
-portfolio:
-  long_n: 5
-  short_n: 5
-  gross_exposure: 1.0
-  net_exposure: 0.0
-  max_abs_weight: 0.2
-  turnover_limit: 0.40
-  rebalance_frequency: weekly_monday
-backtest:
+  bar_interval: "4h"
+  price_basis: "binance_perp"
+  price_file: "prices_4h_perp.csv"
+  spot_price_file: "spot_prices_4h.csv"
+  index_price_file: "index_prices_4h.csv"
+  funding_file: "funding_rates_8h.csv"
+  open_interest_file: "open_interest_8h.csv"
+ts_universe:
+  symbols: [BTC, ETH, SOL, BNB, XRP, ADA, DOGE, AVAX, LINK, DOT, LTC, ATOM]
+ts_research:
+  horizons: [6, 18, 30, 60, 120]
+  primary_horizon: 30
+  signal_z_window: 1512
+  signal_z_min_periods: 360
+  entry_z: 0.75
+  exit_z: 0.25
   one_way_cost_bps: 10
+  output_dir: artifacts/ts4h_factor_research
+  min_history_bars: 540
+  annualization: 2190
+  bars_per_day: 6
+ts_backtest:
   benchmark_symbol: BTC
-  output_dir: artifacts/phase1
+  output_dir: artifacts/ts4h_walkforward
+  risk_weight_vol_window: 120
+raw_predictors:
+  output_dir: artifacts/raw_predictors_4h
+  horizons: [6, 18, 30, 60, 120]
+  primary_horizon: 30
+  bars_per_day: 6
+  annualization: 2190
+standardized_scores:
+  output_dir: artifacts/standardized_scores_4h
+  horizons: [6, 18, 30, 60, 120]
+  primary_horizon: 30
+  z_window: 1512
+  z_min_periods: 360
+  winsor_clip_z: 3.0
+  clip_quantile: 0.01
+  ewm_span: 1512
+  rule_spread_gate: 0.7
+  continuous_strong_spread_gate: 0.7
+  continuous_conditional_spread_gate: 0.45
+  continuous_conditional_monotonicity_gate: 0.5
+continuous_score_experiment:
+  output_dir: artifacts/continuous_score_experiment_4h
+  horizons: [6, 18, 30, 60, 120]
+  primary_horizon: 30
+  window: 1512
+  min_periods: 360
+  clip_quantile: 0.01
+  ewm_span: 1512

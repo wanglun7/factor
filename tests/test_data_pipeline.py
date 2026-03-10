@@ -2,30 +2,38 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
+from data import prepare
 from data.fetcher import LocalCsvProvider, fetch
-from tests.utils import make_csv_dataset, make_panel
+from tests.utils import make_config, make_csv_dataset
 
 
-def test_local_csv_provider_requires_real_files(tmp_path: Path) -> None:
-    provider = LocalCsvProvider(root=tmp_path)
-    with pytest.raises(FileNotFoundError):
-        fetch(start="2021-01-01", end="2021-06-01", provider=provider)
-
-
-def test_prepare_builds_phase1_features(tmp_path: Path) -> None:
+def test_prepare_adds_4h_features_and_optional_sources(tmp_path: Path) -> None:
     make_csv_dataset(tmp_path)
-    panel = make_panel(tmp_path)
-    final_slice = panel.cross_section(panel.dates[-1])
+    config = make_config(tmp_path)
+    provider = LocalCsvProvider(root=tmp_path, config=config.data)
+    bundle = fetch(start=config.data.start_date, end=config.data.end_date, provider=provider)
 
-    expected_columns = {
-        "return_1d",
-        "ret_3d",
-        "ret_20d",
-        "avg_dollar_volume_30d",
-        "days_listed",
-    }
-    assert expected_columns.issubset(set(panel.frame.columns))
-    assert final_slice["ret_20d"].notna().all()
-    assert final_slice["days_listed"].min() >= 90
+    panel = prepare(bundle)
+    assert "ema_120" in panel.frame.columns
+    assert "spot_close" in panel.frame.columns
+    assert "index_close" in panel.frame.columns
+    assert "avg_funding_21period" in panel.frame.columns
+    assert "funding_rate_lag1" in panel.frame.columns
+    assert panel.frame["ret_120bar"].notna().sum() > 0
+    assert panel.frame["breakout_360bar"].notna().sum() > 0
+
+
+def test_prepare_handles_missing_optional_files(tmp_path: Path) -> None:
+    make_csv_dataset(tmp_path)
+    (tmp_path / "funding_rates_8h.csv").unlink()
+    (tmp_path / "spot_prices_4h.csv").unlink()
+    (tmp_path / "index_prices_4h.csv").unlink()
+    config = make_config(tmp_path)
+    provider = LocalCsvProvider(root=tmp_path, config=config.data)
+    bundle = fetch(start=config.data.start_date, end=config.data.end_date, provider=provider)
+
+    panel = prepare(bundle)
+    assert panel.frame["spot_close"].notna().sum() == 0
+    assert panel.frame["index_close"].notna().sum() == 0
+    assert panel.frame["avg_funding_21period"].notna().sum() == 0
+    assert panel.frame["oi_change_21period"].notna().sum() == 0

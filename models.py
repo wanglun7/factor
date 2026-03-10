@@ -6,9 +6,13 @@ import pandas as pd
 
 
 @dataclass(slots=True)
-class RawDataBundle:
+class TSRawDataBundle:
     prices: pd.DataFrame
+    spot_prices: pd.DataFrame
+    index_prices: pd.DataFrame
     universe_meta: pd.DataFrame
+    funding_rates: pd.DataFrame
+    open_interest: pd.DataFrame
 
 
 @dataclass(slots=True)
@@ -23,20 +27,5 @@ class AlignedPanel:
     def symbols(self) -> list[str]:
         return sorted(self.frame.index.get_level_values("symbol").unique())
 
-    def cross_section(self, asof_date: pd.Timestamp) -> pd.DataFrame:
-        return self.frame.xs(pd.Timestamp(asof_date), level="date").copy()
-
     def history_for_symbol(self, symbol: str) -> pd.DataFrame:
         return self.frame.xs(symbol, level="symbol").copy()
-
-
-@dataclass(slots=True)
-class BacktestResult:
-    returns: pd.Series
-    gross_returns: pd.Series
-    costs: pd.Series
-    turnover: pd.Series
-    weights: pd.DataFrame
-    signal_diagnostics: pd.DataFrame
-    metrics: dict[str, float]
-    report_state: str

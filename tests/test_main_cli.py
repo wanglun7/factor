@@ -1,19 +1,16 @@
 from __future__ import annotations
 
-import pytest
-
 from main import build_parser
 
 
-def test_parser_only_exposes_validate_data_and_backtest() -> None:
+def test_parser_accepts_4h_commands() -> None:
     parser = build_parser()
-    backtest_args = parser.parse_args(["backtest"])
-    validate_args = parser.parse_args(["validate-data"])
-
-    assert backtest_args.command == "backtest"
-    assert validate_args.command == "validate-data"
-
-    with pytest.raises(SystemExit):
-        parser.parse_args(["analyze"])
-    with pytest.raises(SystemExit):
-        parser.parse_args(["experiments"])
+    assert parser.parse_args(["validate-data-4h"]).command == "validate-data-4h"
+    assert parser.parse_args(["validate-raw-predictor-data-4h"]).command == "validate-raw-predictor-data-4h"
+    assert parser.parse_args(["validate-standardized-score-data-4h"]).command == "validate-standardized-score-data-4h"
+    assert parser.parse_args(["validate-continuous-score-experiment-data-4h"]).command == "validate-continuous-score-experiment-data-4h"
+    assert parser.parse_args(["raw-predictor-research-4h"]).command == "raw-predictor-research-4h"
+    assert parser.parse_args(["standardized-score-research-4h"]).command == "standardized-score-research-4h"
+    assert parser.parse_args(["continuous-score-experiment-4h"]).command == "continuous-score-experiment-4h"
+    assert parser.parse_args(["ts-factor-research-4h"]).command == "ts-factor-research-4h"
+    assert parser.parse_args(["ts-walkforward-4h"]).command == "ts-walkforward-4h"
