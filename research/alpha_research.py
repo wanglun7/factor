@@ -4,10 +4,17 @@ from pathlib import Path
 
 import pandas as pd
 
-from app_config import CompositeExperimentConfig, RawGenerationConfig, ScaledAlphaConfig, ScoreAdmissionConfig
+from app_config import (
+    CompositeExperimentConfig,
+    PositionMappingConfig,
+    RawGenerationConfig,
+    ScaledAlphaConfig,
+    ScoreAdmissionConfig,
+)
 from models import AlignedPanel
 from research.composite_experiment import run_composite_experiment
 from research.generated_raw import build_generated_raw, write_raw_artifacts
+from research.position_mapping import run_position_mapping
 from research.scaled_alpha import run_scaled_alpha
 from research.score_admission import run_score_admission
 
@@ -34,6 +41,7 @@ def run_alpha_research_4h(
     score_admission_config: ScoreAdmissionConfig,
     composite_experiment_config: CompositeExperimentConfig,
     scaled_alpha_config: ScaledAlphaConfig,
+    position_mapping_config: PositionMappingConfig,
     output_dir: str | Path,
     line: str = "both",
 ) -> dict[str, object]:
@@ -60,7 +68,12 @@ def run_alpha_research_4h(
     assert isinstance(score_frame, pd.DataFrame)
     assert isinstance(score_summary, pd.DataFrame)
 
-    base_price_frame = raw_frame.reset_index()[["date", "symbol", "close"]]
+    market_frame = (
+        panel.frame.reset_index()[["date", "symbol", "close", "next_return_1bar", "realized_vol_120bar"]]
+        .sort_values(["symbol", "date"])
+        .reset_index(drop=True)
+    )
+    base_price_frame = market_frame[["date", "symbol", "close"]]
     composite_result = run_composite_experiment(
         score_summary=score_summary,
         score_frame=score_frame,
@@ -83,6 +96,16 @@ def run_alpha_research_4h(
     scaled_alpha_summary = scaled_alpha_result["summary"]
     assert isinstance(scaled_alpha_summary, pd.DataFrame)
 
+    position_mapping_result = run_position_mapping(
+        scaled_alpha_series=scaled_alpha_result["series"],
+        source_name=str(scaled_alpha_result["source_name"]),
+        market_frame=market_frame,
+        config=position_mapping_config,
+        output_dir=target,
+    )
+    position_mapping_summary = position_mapping_result["summary"]
+    assert isinstance(position_mapping_summary, pd.DataFrame)
+
     return {
         "state": "complete",
         "line": line,
@@ -93,6 +116,9 @@ def run_alpha_research_4h(
         "official_output_verdict": composite_result["official_output_verdict"],
         "scaled_alpha_source_name": scaled_alpha_result["source_name"],
         "scaled_alpha_verdict": scaled_alpha_result["verdict"],
+        "position_mapping_source_name": position_mapping_result["source_name"],
+        "position_mapping_variant": position_mapping_result["variant"],
+        "position_mapping_verdict": position_mapping_result["verdict"],
         "artifacts": {
             "raw_catalog": "generated_raw_predictor_catalog.csv",
             "raw_summary": "generated_raw_predictor_summary.csv",
@@ -109,5 +135,9 @@ def run_alpha_research_4h(
             "scaled_alpha_evaluation": "scaled_alpha_evaluation.csv",
             "scaled_alpha_bucket_diagnostics": "scaled_alpha_bucket_diagnostics.csv",
             "scaled_alpha_evaluation_log": "scaled_alpha_evaluation_log.md",
+            "position_mapping_series": "position_mapping_series.parquet",
+            "position_mapping_variant_summary": "position_mapping_variant_summary.csv",
+            "position_mapping_summary": "position_mapping_summary.csv",
+            "position_mapping_decision_log": "position_mapping_decision_log.md",
         },
     }

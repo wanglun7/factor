@@ -83,3 +83,13 @@ scaled_alpha:
   scale_quantile: 0.95
   clip_min: -1.0
   clip_max: 1.0
+position_mapping:
+  output_dir: artifacts/position_mapping_4h
+  position_scale: 1.0
+  max_abs_position: 1.0
+  rebalance_band: 0.10
+  vol_window: 120
+  target_annual_vol: 0.40
+  min_annual_vol_floor: 0.10
+  one_way_cost_bps: 10
+  annualization: 2190

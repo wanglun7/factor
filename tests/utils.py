@@ -7,6 +7,7 @@ import pandas as pd
 
 from app_config import (
     CompositeExperimentConfig,
+    PositionMappingConfig,
     RawGenerationConfig,
     RawGeneratorV2Config,
     RuleGeneratorConfig,
@@ -206,5 +207,16 @@ def make_config(root: Path) -> RunConfig:
             scale_quantile=config.scaled_alpha.scale_quantile,
             clip_min=config.scaled_alpha.clip_min,
             clip_max=config.scaled_alpha.clip_max,
+        ),
+        position_mapping=PositionMappingConfig(
+            output_dir=config.position_mapping.output_dir,
+            position_scale=config.position_mapping.position_scale,
+            max_abs_position=config.position_mapping.max_abs_position,
+            rebalance_band=config.position_mapping.rebalance_band,
+            vol_window=config.position_mapping.vol_window,
+            target_annual_vol=config.position_mapping.target_annual_vol,
+            min_annual_vol_floor=config.position_mapping.min_annual_vol_floor,
+            one_way_cost_bps=config.position_mapping.one_way_cost_bps,
+            annualization=config.position_mapping.annualization,
         ),
     )

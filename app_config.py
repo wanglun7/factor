@@ -125,6 +125,19 @@ class ScaledAlphaConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class PositionMappingConfig:
+    output_dir: str
+    position_scale: float
+    max_abs_position: float
+    rebalance_band: float
+    vol_window: int
+    target_annual_vol: float
+    min_annual_vol_floor: float
+    one_way_cost_bps: float
+    annualization: int
+
+
+@dataclass(frozen=True, slots=True)
 class RunConfig:
     data: DataConfig
     ts_universe: TSUniverseConfig
@@ -134,6 +147,7 @@ class RunConfig:
     score_admission: ScoreAdmissionConfig
     composite_experiment: CompositeExperimentConfig
     scaled_alpha: ScaledAlphaConfig
+    position_mapping: PositionMappingConfig
 
 
 def _read_yaml(path: str | Path) -> dict[str, Any]:
@@ -153,6 +167,7 @@ def load_config(path: str | Path) -> RunConfig:
     score_admission = raw.get("score_admission", raw.get("standardized_scores", {}) or {}) or {}
     composite_experiment = raw.get("composite_experiment", raw.get("composite_alpha", {}) or {}) or {}
     scaled_alpha = raw.get("scaled_alpha", {}) or {}
+    position_mapping = raw.get("position_mapping", {}) or {}
 
     default_symbols = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "LINK", "DOT", "LTC", "ATOM"]
     default_bars_per_day = int(ts_research.get("bars_per_day", 6))
@@ -253,5 +268,16 @@ def load_config(path: str | Path) -> RunConfig:
             scale_quantile=float(scaled_alpha.get("scale_quantile", 0.95)),
             clip_min=float(scaled_alpha.get("clip_min", -1.0)),
             clip_max=float(scaled_alpha.get("clip_max", 1.0)),
+        ),
+        position_mapping=PositionMappingConfig(
+            output_dir=str(position_mapping.get("output_dir", "artifacts/position_mapping_4h")),
+            position_scale=float(position_mapping.get("position_scale", 1.0)),
+            max_abs_position=float(position_mapping.get("max_abs_position", 1.0)),
+            rebalance_band=float(position_mapping.get("rebalance_band", 0.10)),
+            vol_window=int(position_mapping.get("vol_window", 120)),
+            target_annual_vol=float(position_mapping.get("target_annual_vol", 0.40)),
+            min_annual_vol_floor=float(position_mapping.get("min_annual_vol_floor", 0.10)),
+            one_way_cost_bps=float(position_mapping.get("one_way_cost_bps", 10.0)),
+            annualization=int(position_mapping.get("annualization", default_annualization)),
         ),
     )
