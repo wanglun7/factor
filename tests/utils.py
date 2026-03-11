@@ -5,7 +5,18 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from app_config import RunConfig, TSBacktestConfig, TSResearchConfig, TSUniverseConfig, load_config
+from app_config import (
+    CompositeExperimentConfig,
+    RawGenerationConfig,
+    RawGeneratorV2Config,
+    RuleGeneratorConfig,
+    RunConfig,
+    ScoreAdmissionConfig,
+    TSBacktestConfig,
+    TSResearchConfig,
+    TSUniverseConfig,
+    load_config,
+)
 from data.cleaner import prepare
 from data.fetcher import LocalCsvProvider, fetch
 
@@ -134,34 +145,55 @@ def make_config(root: Path) -> RunConfig:
             output_dir=config.ts_backtest.output_dir,
             risk_weight_vol_window=config.ts_backtest.risk_weight_vol_window,
         ),
-        raw_predictors=type(config.raw_predictors)(
-            output_dir=config.raw_predictors.output_dir,
-            horizons=config.raw_predictors.horizons,
-            primary_horizon=config.raw_predictors.primary_horizon,
-            bars_per_day=config.raw_predictors.bars_per_day,
-            annualization=config.raw_predictors.annualization,
+        raw_generation=RawGenerationConfig(
+            descriptor=RawGeneratorV2Config(
+                output_dir=config.raw_generation.descriptor.output_dir,
+                symbols=["BTC"],
+                descriptors=config.raw_generation.descriptor.descriptors,
+                transforms=config.raw_generation.descriptor.transforms,
+                horizon_groups=config.raw_generation.descriptor.horizon_groups,
+                primary_horizon=config.raw_generation.descriptor.primary_horizon,
+            ),
+            rule=RuleGeneratorConfig(
+                output_dir=config.raw_generation.rule.output_dir,
+                symbols=["BTC"],
+                families=config.raw_generation.rule.families,
+                forms=config.raw_generation.rule.forms,
+                horizon_groups=config.raw_generation.rule.horizon_groups,
+                filter_threshold_bps=config.raw_generation.rule.filter_threshold_bps,
+                primary_horizon=config.raw_generation.rule.primary_horizon,
+            ),
         ),
-        standardized_scores=type(config.standardized_scores)(
-            output_dir=config.standardized_scores.output_dir,
-            horizons=config.standardized_scores.horizons,
-            primary_horizon=config.standardized_scores.primary_horizon,
+        score_admission=ScoreAdmissionConfig(
+            output_dir=config.score_admission.output_dir,
+            horizons=config.score_admission.horizons,
+            primary_horizon=config.score_admission.primary_horizon,
             z_window=360,
             z_min_periods=120,
-            winsor_clip_z=config.standardized_scores.winsor_clip_z,
-            clip_quantile=config.standardized_scores.clip_quantile,
+            clip_quantile=config.score_admission.clip_quantile,
             ewm_span=360,
-            rule_spread_gate=config.standardized_scores.rule_spread_gate,
-            continuous_strong_spread_gate=config.standardized_scores.continuous_strong_spread_gate,
-            continuous_conditional_spread_gate=config.standardized_scores.continuous_conditional_spread_gate,
-            continuous_conditional_monotonicity_gate=config.standardized_scores.continuous_conditional_monotonicity_gate,
+            rule_integrity_spread_gate=config.score_admission.rule_integrity_spread_gate,
+            continuous_strong_spread_gate=config.score_admission.continuous_strong_spread_gate,
+            continuous_conditional_spread_gate=config.score_admission.continuous_conditional_spread_gate,
+            continuous_conditional_monotonicity_gate=config.score_admission.continuous_conditional_monotonicity_gate,
+            admission_generator_strength_floor=config.score_admission.admission_generator_strength_floor,
+            admission_family_strength_floor=config.score_admission.admission_family_strength_floor,
+            admission_family_rank_cap=config.score_admission.admission_family_rank_cap,
+            admission_rank_metric_positive=config.score_admission.admission_rank_metric_positive,
+            admission_rank_metric_floor=config.score_admission.admission_rank_metric_floor,
         ),
-        continuous_score_experiment=type(config.continuous_score_experiment)(
-            output_dir=config.continuous_score_experiment.output_dir,
-            horizons=config.continuous_score_experiment.horizons,
-            primary_horizon=config.continuous_score_experiment.primary_horizon,
-            window=360,
-            min_periods=120,
-            clip_quantile=config.continuous_score_experiment.clip_quantile,
-            ewm_span=360,
+        composite_experiment=CompositeExperimentConfig(
+            output_dir=config.composite_experiment.output_dir,
+            horizons=config.composite_experiment.horizons,
+            primary_horizon=config.composite_experiment.primary_horizon,
+            max_scores_per_family=config.composite_experiment.max_scores_per_family,
+            redundancy_corr_threshold=config.composite_experiment.redundancy_corr_threshold,
+            anchor_satellite_weights=config.composite_experiment.anchor_satellite_weights,
+            robust_relative_strength_floor=config.composite_experiment.robust_relative_strength_floor,
+            robust_stability_improvement_min=config.composite_experiment.robust_stability_improvement_min,
+            bootstrap_block_size=12,
+            bootstrap_samples=40,
+            bootstrap_seed=config.composite_experiment.bootstrap_seed,
+            ic_weighted_subcomposite=config.composite_experiment.ic_weighted_subcomposite,
         ),
     )

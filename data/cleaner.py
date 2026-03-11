@@ -31,7 +31,9 @@ def _compute_price_features(prices: pd.DataFrame) -> pd.DataFrame:
     frame["ret_120bar"] = frame["lag_close"] / grouped["lag_close"].shift(120) - 1.0
     frame["ret_360bar"] = frame["lag_close"] / grouped["lag_close"].shift(360) - 1.0
     frame["next_return_1bar"] = grouped["close"].shift(-1) / frame["close"] - 1.0
+    frame["realized_vol_30bar"] = grouped["ret_1bar"].transform(lambda values: values.rolling(30, min_periods=30).std(ddof=0) * np.sqrt(ANNUALIZATION))
     frame["realized_vol_120bar"] = grouped["ret_1bar"].transform(lambda values: values.rolling(120, min_periods=120).std(ddof=0) * np.sqrt(ANNUALIZATION))
+    frame["avg_dollar_volume_30bar"] = grouped["lag_dollar_volume"].transform(lambda values: values.rolling(30, min_periods=30).mean())
     frame["avg_dollar_volume_120bar"] = grouped["lag_dollar_volume"].transform(lambda values: values.rolling(120, min_periods=120).mean())
     frame["ema_120"] = grouped["close"].transform(lambda values: values.shift(1).ewm(span=120, adjust=False, min_periods=120).mean())
     frame["ema_360"] = grouped["close"].transform(lambda values: values.shift(1).ewm(span=360, adjust=False, min_periods=360).mean())
@@ -41,6 +43,7 @@ def _compute_price_features(prices: pd.DataFrame) -> pd.DataFrame:
     frame["up_bar_count_30"] = grouped["ret_1bar"].transform(lambda values: values.gt(0).rolling(30, min_periods=30).sum())
     frame["down_bar_count_30"] = grouped["ret_1bar"].transform(lambda values: values.lt(0).rolling(30, min_periods=30).sum())
     frame["amihud_raw"] = frame["ret_1bar"].abs() / frame["lag_dollar_volume"].replace(0.0, np.nan)
+    frame["amihud_30bar"] = grouped["amihud_raw"].transform(lambda values: values.rolling(30, min_periods=30).mean())
     frame["amihud_120bar"] = grouped["amihud_raw"].transform(lambda values: values.rolling(120, min_periods=120).mean())
     return frame.drop(columns=["amihud_raw"])
 

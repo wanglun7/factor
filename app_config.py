@@ -43,46 +43,73 @@ class TSResearchConfig:
 
 
 @dataclass(frozen=True, slots=True)
-class RawPredictorConfig:
+class TSBacktestConfig:
+    benchmark_symbol: str
     output_dir: str
-    horizons: list[int]
-    primary_horizon: int
-    bars_per_day: int
-    annualization: int
+    risk_weight_vol_window: int
 
 
 @dataclass(frozen=True, slots=True)
-class StandardizedScoreConfig:
+class RawGeneratorV2Config:
+    output_dir: str
+    symbols: list[str]
+    descriptors: list[str]
+    transforms: list[str]
+    horizon_groups: list[str]
+    primary_horizon: int
+
+
+@dataclass(frozen=True, slots=True)
+class RuleGeneratorConfig:
+    output_dir: str
+    symbols: list[str]
+    families: list[str]
+    forms: list[str]
+    horizon_groups: list[str]
+    filter_threshold_bps: list[int]
+    primary_horizon: int
+
+
+@dataclass(frozen=True, slots=True)
+class RawGenerationConfig:
+    descriptor: RawGeneratorV2Config
+    rule: RuleGeneratorConfig
+
+
+@dataclass(frozen=True, slots=True)
+class ScoreAdmissionConfig:
     output_dir: str
     horizons: list[int]
     primary_horizon: int
     z_window: int
     z_min_periods: int
-    winsor_clip_z: float
     clip_quantile: float
     ewm_span: int
-    rule_spread_gate: float
+    rule_integrity_spread_gate: float
     continuous_strong_spread_gate: float
     continuous_conditional_spread_gate: float
     continuous_conditional_monotonicity_gate: float
+    admission_generator_strength_floor: float
+    admission_family_strength_floor: float
+    admission_family_rank_cap: int
+    admission_rank_metric_positive: float
+    admission_rank_metric_floor: float
 
 
 @dataclass(frozen=True, slots=True)
-class ContinuousScoreExperimentConfig:
+class CompositeExperimentConfig:
     output_dir: str
     horizons: list[int]
     primary_horizon: int
-    window: int
-    min_periods: int
-    clip_quantile: float
-    ewm_span: int
-
-
-@dataclass(frozen=True, slots=True)
-class TSBacktestConfig:
-    benchmark_symbol: str
-    output_dir: str
-    risk_weight_vol_window: int
+    max_scores_per_family: int
+    redundancy_corr_threshold: float
+    anchor_satellite_weights: list[float]
+    robust_relative_strength_floor: float
+    robust_stability_improvement_min: float
+    bootstrap_block_size: int
+    bootstrap_samples: int
+    bootstrap_seed: int
+    ic_weighted_subcomposite: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,9 +118,9 @@ class RunConfig:
     ts_universe: TSUniverseConfig
     ts_research: TSResearchConfig
     ts_backtest: TSBacktestConfig
-    raw_predictors: RawPredictorConfig
-    standardized_scores: StandardizedScoreConfig
-    continuous_score_experiment: ContinuousScoreExperimentConfig
+    raw_generation: RawGenerationConfig
+    score_admission: ScoreAdmissionConfig
+    composite_experiment: CompositeExperimentConfig
 
 
 def _read_yaml(path: str | Path) -> dict[str, Any]:
@@ -107,9 +134,11 @@ def load_config(path: str | Path) -> RunConfig:
     ts_universe = raw.get("ts_universe", {}) or {}
     ts_research = raw.get("ts_research", {}) or {}
     ts_backtest = raw.get("ts_backtest", {}) or {}
-    raw_predictors = raw.get("raw_predictors", {}) or {}
-    standardized_scores = raw.get("standardized_scores", {}) or {}
-    continuous_score_experiment = raw.get("continuous_score_experiment", {}) or {}
+    raw_generation = raw.get("raw_generation", {}) or {}
+    descriptor = raw_generation.get("descriptor", raw.get("raw_generator_v2", {}) or {}) or {}
+    rule = raw_generation.get("rule", raw.get("rule_generator", {}) or {}) or {}
+    score_admission = raw.get("score_admission", raw.get("standardized_scores", {}) or {}) or {}
+    composite_experiment = raw.get("composite_experiment", raw.get("composite_alpha", {}) or {}) or {}
 
     default_symbols = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "LINK", "DOT", "LTC", "ATOM"]
     default_bars_per_day = int(ts_research.get("bars_per_day", 6))
@@ -150,34 +179,55 @@ def load_config(path: str | Path) -> RunConfig:
             output_dir=str(ts_backtest.get("output_dir", "artifacts/ts4h_walkforward")),
             risk_weight_vol_window=int(ts_backtest.get("risk_weight_vol_window", 120)),
         ),
-        raw_predictors=RawPredictorConfig(
-            output_dir=str(raw_predictors.get("output_dir", "artifacts/raw_predictors_4h")),
-            horizons=[int(x) for x in raw_predictors.get("horizons", ts_research.get("horizons", [6, 18, 30, 60, 120]))],
-            primary_horizon=int(raw_predictors.get("primary_horizon", ts_research.get("primary_horizon", 30))),
-            bars_per_day=int(raw_predictors.get("bars_per_day", default_bars_per_day)),
-            annualization=int(raw_predictors.get("annualization", default_annualization)),
+        raw_generation=RawGenerationConfig(
+            descriptor=RawGeneratorV2Config(
+                output_dir=str(descriptor.get("output_dir", "artifacts/raw_generation/descriptor")),
+                symbols=[str(symbol) for symbol in descriptor.get("symbols", ["BTC"])],
+                descriptors=[str(item) for item in descriptor.get("descriptors", ["return", "realized_volatility", "dollar_volume", "amihud", "funding", "basis", "premium"])],
+                transforms=[str(item) for item in descriptor.get("transforms", ["level", "change", "deviation", "ratio", "percentile", "vol_adjusted"])],
+                horizon_groups=[str(item) for item in descriptor.get("horizon_groups", ["short", "medium", "long"])],
+                primary_horizon=int(descriptor.get("primary_horizon", 30)),
+            ),
+            rule=RuleGeneratorConfig(
+                output_dir=str(rule.get("output_dir", "artifacts/raw_generation/rule")),
+                symbols=[str(symbol) for symbol in rule.get("symbols", ["BTC"])],
+                families=[str(item) for item in rule.get("families", ["moving_average_rule", "trading_range_breakout", "filter_rule"])],
+                forms=[str(item) for item in rule.get("forms", ["price_above_sma", "price_above_ema", "sma_crossover", "ema_crossover", "breakout_high_low", "price_filter_from_lag"])],
+                horizon_groups=[str(item) for item in rule.get("horizon_groups", ["native_intraday", "classic_daily"])],
+                filter_threshold_bps=[int(x) for x in rule.get("filter_threshold_bps", [50, 100, 200])],
+                primary_horizon=int(rule.get("primary_horizon", 30)),
+            ),
         ),
-        standardized_scores=StandardizedScoreConfig(
-            output_dir=str(standardized_scores.get("output_dir", "artifacts/standardized_scores_4h")),
-            horizons=[int(x) for x in standardized_scores.get("horizons", ts_research.get("horizons", [6, 18, 30, 60, 120]))],
-            primary_horizon=int(standardized_scores.get("primary_horizon", ts_research.get("primary_horizon", 30))),
-            z_window=int(standardized_scores.get("z_window", 1512)),
-            z_min_periods=int(standardized_scores.get("z_min_periods", 360)),
-            winsor_clip_z=float(standardized_scores.get("winsor_clip_z", 3.0)),
-            clip_quantile=float(standardized_scores.get("clip_quantile", 0.01)),
-            ewm_span=int(standardized_scores.get("ewm_span", 1512)),
-            rule_spread_gate=float(standardized_scores.get("rule_spread_gate", 0.7)),
-            continuous_strong_spread_gate=float(standardized_scores.get("continuous_strong_spread_gate", 0.7)),
-            continuous_conditional_spread_gate=float(standardized_scores.get("continuous_conditional_spread_gate", 0.45)),
-            continuous_conditional_monotonicity_gate=float(standardized_scores.get("continuous_conditional_monotonicity_gate", 0.5)),
+        score_admission=ScoreAdmissionConfig(
+            output_dir=str(score_admission.get("output_dir", "artifacts/score_admission_4h")),
+            horizons=[int(x) for x in score_admission.get("horizons", ts_research.get("horizons", [6, 18, 30, 60, 120]))],
+            primary_horizon=int(score_admission.get("primary_horizon", ts_research.get("primary_horizon", 30))),
+            z_window=int(score_admission.get("z_window", 1512)),
+            z_min_periods=int(score_admission.get("z_min_periods", 360)),
+            clip_quantile=float(score_admission.get("clip_quantile", 0.01)),
+            ewm_span=int(score_admission.get("ewm_span", 1512)),
+            rule_integrity_spread_gate=float(score_admission.get("rule_integrity_spread_gate", 0.7)),
+            continuous_strong_spread_gate=float(score_admission.get("continuous_strong_spread_gate", 0.7)),
+            continuous_conditional_spread_gate=float(score_admission.get("continuous_conditional_spread_gate", 0.45)),
+            continuous_conditional_monotonicity_gate=float(score_admission.get("continuous_conditional_monotonicity_gate", 0.5)),
+            admission_generator_strength_floor=float(score_admission.get("admission_generator_strength_floor", score_admission.get("admission_global_strength_floor", 0.30))),
+            admission_family_strength_floor=float(score_admission.get("admission_family_strength_floor", 0.50)),
+            admission_family_rank_cap=int(score_admission.get("admission_family_rank_cap", 3)),
+            admission_rank_metric_positive=float(score_admission.get("admission_rank_metric_positive", 0.0)),
+            admission_rank_metric_floor=float(score_admission.get("admission_rank_metric_floor", 0.015)),
         ),
-        continuous_score_experiment=ContinuousScoreExperimentConfig(
-            output_dir=str(continuous_score_experiment.get("output_dir", "artifacts/continuous_score_experiment_4h")),
-            horizons=[int(x) for x in continuous_score_experiment.get("horizons", ts_research.get("horizons", [6, 18, 30, 60, 120]))],
-            primary_horizon=int(continuous_score_experiment.get("primary_horizon", ts_research.get("primary_horizon", 30))),
-            window=int(continuous_score_experiment.get("window", 1512)),
-            min_periods=int(continuous_score_experiment.get("min_periods", 360)),
-            clip_quantile=float(continuous_score_experiment.get("clip_quantile", 0.01)),
-            ewm_span=int(continuous_score_experiment.get("ewm_span", 1512)),
+        composite_experiment=CompositeExperimentConfig(
+            output_dir=str(composite_experiment.get("output_dir", "artifacts/composite_experiment_4h")),
+            horizons=[int(x) for x in composite_experiment.get("horizons", ts_research.get("horizons", [6, 18, 30, 60, 120]))],
+            primary_horizon=int(composite_experiment.get("primary_horizon", ts_research.get("primary_horizon", 30))),
+            max_scores_per_family=int(composite_experiment.get("max_scores_per_family", 2)),
+            redundancy_corr_threshold=float(composite_experiment.get("redundancy_corr_threshold", 0.85)),
+            anchor_satellite_weights=[float(x) for x in composite_experiment.get("anchor_satellite_weights", [0.10, 0.20, 0.30])],
+            robust_relative_strength_floor=float(composite_experiment.get("robust_relative_strength_floor", 0.90)),
+            robust_stability_improvement_min=float(composite_experiment.get("robust_stability_improvement_min", 0.05)),
+            bootstrap_block_size=int(composite_experiment.get("bootstrap_block_size", 24)),
+            bootstrap_samples=int(composite_experiment.get("bootstrap_samples", 200)),
+            bootstrap_seed=int(composite_experiment.get("bootstrap_seed", 7)),
+            ic_weighted_subcomposite=bool(composite_experiment.get("ic_weighted_subcomposite", True)),
         ),
     )
