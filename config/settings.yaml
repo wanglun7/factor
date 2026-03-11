@@ -93,3 +93,16 @@ position_mapping:
   min_annual_vol_floor: 0.10
   one_way_cost_bps: 10
   annualization: 2190
+execution_realism:
+  output_dir: artifacts/execution_realism_4h
+  execution_lag_bars: 1
+  delay_sensitivity_bars: [1, 2]
+  base_one_way_cost_bps: 10
+  vol_cost_multiplier_bps: 5
+  turnover_cost_multiplier_bps: 10
+  liquidity_cost_multiplier_bps: 5
+  vol_window: 120
+  liquidity_column: amihud_120bar
+  annualization: 2190
+  strong_relative_return_floor: 0.90
+  robust_relative_return_floor: 0.80

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from research import run_alpha_research_4h, validate_alpha_research_data_4h
@@ -35,6 +36,7 @@ def test_alpha_research_4h_writes_unified_artifacts_and_admission_fields(tmp_pat
         composite_experiment_config=config.composite_experiment,
         scaled_alpha_config=config.scaled_alpha,
         position_mapping_config=config.position_mapping,
+        execution_realism_config=config.execution_realism,
         output_dir=tmp_path / "alpha_research_4h",
         line="both",
     )
@@ -57,8 +59,14 @@ def test_alpha_research_4h_writes_unified_artifacts_and_admission_fields(tmp_pat
     assert (out_dir / "scaled_alpha_evaluation_log.md").exists()
     assert (out_dir / "position_mapping_series.parquet").exists()
     assert (out_dir / "position_mapping_variant_summary.csv").exists()
+    assert (out_dir / "position_mapping_horse_race.csv").exists()
     assert (out_dir / "position_mapping_summary.csv").exists()
     assert (out_dir / "position_mapping_decision_log.md").exists()
+    assert (out_dir / "execution_realism_series.parquet").exists()
+    assert (out_dir / "execution_realism_path_summary.csv").exists()
+    assert (out_dir / "execution_realism_variant_summary.csv").exists()
+    assert (out_dir / "execution_realism_summary.csv").exists()
+    assert (out_dir / "execution_realism_decision_log.md").exists()
 
     score_summary = pd.read_csv(out_dir / "standardized_score_summary.csv")
     assert {
@@ -80,8 +88,12 @@ def test_alpha_research_4h_writes_unified_artifacts_and_admission_fields(tmp_pat
     assert report["scaled_alpha_source_name"] == report["official_output_name"]
     assert report["scaled_alpha_verdict"] in {"strong_pass", "conditional_pass", "fail"}
     assert report["position_mapping_source_name"] == report["scaled_alpha_source_name"]
-    assert report["position_mapping_variant"] == "linear_band_vol_target"
-    assert report["position_mapping_verdict"] in {"strong_pass", "conditional_pass", "fail"}
+    assert report["position_mapping_variant"] in {"linear_target_only", "linear_band", "linear_band_vol_target"}
+    assert report["position_mapping_winner_verdict"] in {"strong_win", "robust_win", "anchor_fallback"}
+    assert report["execution_realism_source_name"] == report["position_mapping_source_name"]
+    assert report["official_position_variant"] in {"linear_target_only", "linear_band", "linear_band_vol_target"}
+    assert report["official_execution_variant"] == "lag_1_execution_with_state_cost"
+    assert report["execution_realism_winner_verdict"] in {"strong_win", "robust_win", "anchor_fallback"}
 
     scaled_summary = pd.read_csv(out_dir / "scaled_alpha_summary.csv")
     assert {"source_name", "coverage_ratio", "scaled_alpha_clip_rate"}.issubset(scaled_summary.columns)
@@ -110,11 +122,15 @@ def test_alpha_research_4h_writes_unified_artifacts_and_admission_fields(tmp_pat
     assert {"variant", "mean_turnover", "net_total_return", "sharpe"}.issubset(position_variant_summary.columns)
     assert set(position_variant_summary["variant"]) == {"linear_target_only", "linear_band", "linear_band_vol_target"}
 
+    position_horse_race = pd.read_csv(out_dir / "position_mapping_horse_race.csv")
+    assert {"variant", "anchor_variant", "verdict"}.issubset(position_horse_race.columns)
+    assert set(position_horse_race["verdict"]).issubset({"anchor", "strong_win", "robust_win", "fail"})
+
     position_summary = pd.read_csv(out_dir / "position_mapping_summary.csv")
-    assert {"source_name", "variant", "verdict", "scaled_alpha_to_realized_corr"}.issubset(position_summary.columns)
+    assert {"source_name", "variant", "winner_verdict", "scaled_alpha_to_realized_corr"}.issubset(position_summary.columns)
     assert position_summary.loc[0, "source_name"] == report["scaled_alpha_source_name"]
     assert position_summary.loc[0, "variant"] == report["position_mapping_variant"]
-    assert position_summary.loc[0, "verdict"] == report["position_mapping_verdict"]
+    assert position_summary.loc[0, "winner_verdict"] == report["position_mapping_winner_verdict"]
 
     position_series = pd.read_parquet(out_dir / "position_mapping_series.parquet")
     assert {
@@ -129,3 +145,57 @@ def test_alpha_research_4h_writes_unified_artifacts_and_admission_fields(tmp_pat
     }.issubset(position_series.columns)
     valid_positions = position_series["realized_position"].dropna()
     assert valid_positions.empty or ((valid_positions >= -1.0) & (valid_positions <= 1.0)).all()
+
+    execution_path_summary = pd.read_csv(out_dir / "execution_realism_path_summary.csv")
+    assert {"mapping_variant", "path_name", "net_total_return", "sharpe"}.issubset(execution_path_summary.columns)
+    assert set(execution_path_summary["mapping_variant"]) == {"linear_target_only", "linear_band", "linear_band_vol_target"}
+
+    execution_variant_summary = pd.read_csv(out_dir / "execution_realism_variant_summary.csv")
+    assert {
+        "mapping_variant",
+        "path_name",
+        "net_total_return",
+        "sharpe",
+        "cost_drag",
+        "verdict",
+    }.issubset(execution_variant_summary.columns)
+    assert set(execution_variant_summary["mapping_variant"]) == {"linear_target_only", "linear_band", "linear_band_vol_target"}
+    assert set(execution_variant_summary["verdict"]).issubset({"anchor", "strong_win", "robust_win", "fail"})
+
+    execution_summary = pd.read_csv(out_dir / "execution_realism_summary.csv")
+    assert {
+        "source_name",
+        "official_position_variant",
+        "official_execution_variant",
+        "implementation_shortfall",
+        "execution_lag_drag",
+        "state_cost_drag",
+        "delay_sensitivity_drag",
+        "winner_verdict",
+    }.issubset(execution_summary.columns)
+    assert execution_summary.loc[0, "source_name"] == report["execution_realism_source_name"]
+    assert execution_summary.loc[0, "official_position_variant"] == report["official_position_variant"]
+    assert execution_summary.loc[0, "official_execution_variant"] == report["official_execution_variant"]
+    assert execution_summary.loc[0, "winner_verdict"] == report["execution_realism_winner_verdict"]
+
+    execution_series = pd.read_parquet(out_dir / "execution_realism_series.parquet")
+    assert {
+        "variant",
+        "path_name",
+        "paper_position",
+        "executed_position",
+        "effective_cost_bps",
+        "gross_return",
+        "net_return",
+    }.issubset(execution_series.columns)
+    variant_filter = "linear_target_only"
+    lag1 = execution_series.loc[
+        (execution_series["variant"] == variant_filter) & (execution_series["path_name"] == "lag_1_execution"),
+        "executed_position",
+    ].reset_index(drop=True)
+    paper = execution_series.loc[
+        (execution_series["variant"] == variant_filter) & (execution_series["path_name"] == "paper_position_path"),
+        "paper_position",
+    ].fillna(0.0).reset_index(drop=True)
+    if len(lag1) > 1 and len(paper) > 1:
+        assert np.allclose(lag1.iloc[1:].to_numpy(dtype=float), paper.iloc[:-1].to_numpy(dtype=float), equal_nan=True)

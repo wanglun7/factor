@@ -6,6 +6,7 @@ import pandas as pd
 
 from app_config import (
     CompositeExperimentConfig,
+    ExecutionRealismConfig,
     PositionMappingConfig,
     RawGenerationConfig,
     ScaledAlphaConfig,
@@ -13,6 +14,7 @@ from app_config import (
 )
 from models import AlignedPanel
 from research.composite_experiment import run_composite_experiment
+from research.execution_realism import run_execution_realism
 from research.generated_raw import build_generated_raw, write_raw_artifacts
 from research.position_mapping import run_position_mapping
 from research.scaled_alpha import run_scaled_alpha
@@ -42,6 +44,7 @@ def run_alpha_research_4h(
     composite_experiment_config: CompositeExperimentConfig,
     scaled_alpha_config: ScaledAlphaConfig,
     position_mapping_config: PositionMappingConfig,
+    execution_realism_config: ExecutionRealismConfig,
     output_dir: str | Path,
     line: str = "both",
 ) -> dict[str, object]:
@@ -106,6 +109,16 @@ def run_alpha_research_4h(
     position_mapping_summary = position_mapping_result["summary"]
     assert isinstance(position_mapping_summary, pd.DataFrame)
 
+    execution_realism_result = run_execution_realism(
+        position_mapping_series=position_mapping_result["series"],
+        source_name=str(position_mapping_result["source_name"]),
+        market_frame=panel.frame.reset_index()[["date", "symbol", "next_return_1bar", "realized_vol_120bar", "amihud_120bar"]],
+        config=execution_realism_config,
+        output_dir=target,
+    )
+    execution_realism_summary = execution_realism_result["summary"]
+    assert isinstance(execution_realism_summary, pd.DataFrame)
+
     return {
         "state": "complete",
         "line": line,
@@ -118,7 +131,11 @@ def run_alpha_research_4h(
         "scaled_alpha_verdict": scaled_alpha_result["verdict"],
         "position_mapping_source_name": position_mapping_result["source_name"],
         "position_mapping_variant": position_mapping_result["variant"],
-        "position_mapping_verdict": position_mapping_result["verdict"],
+        "position_mapping_winner_verdict": position_mapping_result["verdict"],
+        "execution_realism_source_name": execution_realism_result["source_name"],
+        "official_position_variant": execution_realism_result["position_variant"],
+        "official_execution_variant": execution_realism_result["variant"],
+        "execution_realism_winner_verdict": execution_realism_result["verdict"],
         "artifacts": {
             "raw_catalog": "generated_raw_predictor_catalog.csv",
             "raw_summary": "generated_raw_predictor_summary.csv",
@@ -137,7 +154,13 @@ def run_alpha_research_4h(
             "scaled_alpha_evaluation_log": "scaled_alpha_evaluation_log.md",
             "position_mapping_series": "position_mapping_series.parquet",
             "position_mapping_variant_summary": "position_mapping_variant_summary.csv",
+            "position_mapping_horse_race": "position_mapping_horse_race.csv",
             "position_mapping_summary": "position_mapping_summary.csv",
             "position_mapping_decision_log": "position_mapping_decision_log.md",
+            "execution_realism_series": "execution_realism_series.parquet",
+            "execution_realism_path_summary": "execution_realism_path_summary.csv",
+            "execution_realism_variant_summary": "execution_realism_variant_summary.csv",
+            "execution_realism_summary": "execution_realism_summary.csv",
+            "execution_realism_decision_log": "execution_realism_decision_log.md",
         },
     }

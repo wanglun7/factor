@@ -7,6 +7,7 @@ import pandas as pd
 
 from app_config import (
     CompositeExperimentConfig,
+    ExecutionRealismConfig,
     PositionMappingConfig,
     RawGenerationConfig,
     RawGeneratorV2Config,
@@ -218,5 +219,19 @@ def make_config(root: Path) -> RunConfig:
             min_annual_vol_floor=config.position_mapping.min_annual_vol_floor,
             one_way_cost_bps=config.position_mapping.one_way_cost_bps,
             annualization=config.position_mapping.annualization,
+        ),
+        execution_realism=ExecutionRealismConfig(
+            output_dir=config.execution_realism.output_dir,
+            execution_lag_bars=config.execution_realism.execution_lag_bars,
+            delay_sensitivity_bars=config.execution_realism.delay_sensitivity_bars,
+            base_one_way_cost_bps=config.execution_realism.base_one_way_cost_bps,
+            vol_cost_multiplier_bps=config.execution_realism.vol_cost_multiplier_bps,
+            turnover_cost_multiplier_bps=config.execution_realism.turnover_cost_multiplier_bps,
+            liquidity_cost_multiplier_bps=config.execution_realism.liquidity_cost_multiplier_bps,
+            vol_window=config.execution_realism.vol_window,
+            liquidity_column=config.execution_realism.liquidity_column,
+            annualization=config.execution_realism.annualization,
+            strong_relative_return_floor=config.execution_realism.strong_relative_return_floor,
+            robust_relative_return_floor=config.execution_realism.robust_relative_return_floor,
         ),
     )

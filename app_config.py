@@ -138,6 +138,22 @@ class PositionMappingConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class ExecutionRealismConfig:
+    output_dir: str
+    execution_lag_bars: int
+    delay_sensitivity_bars: list[int]
+    base_one_way_cost_bps: float
+    vol_cost_multiplier_bps: float
+    turnover_cost_multiplier_bps: float
+    liquidity_cost_multiplier_bps: float
+    vol_window: int
+    liquidity_column: str
+    annualization: int
+    strong_relative_return_floor: float
+    robust_relative_return_floor: float
+
+
+@dataclass(frozen=True, slots=True)
 class RunConfig:
     data: DataConfig
     ts_universe: TSUniverseConfig
@@ -148,6 +164,7 @@ class RunConfig:
     composite_experiment: CompositeExperimentConfig
     scaled_alpha: ScaledAlphaConfig
     position_mapping: PositionMappingConfig
+    execution_realism: ExecutionRealismConfig
 
 
 def _read_yaml(path: str | Path) -> dict[str, Any]:
@@ -168,6 +185,7 @@ def load_config(path: str | Path) -> RunConfig:
     composite_experiment = raw.get("composite_experiment", raw.get("composite_alpha", {}) or {}) or {}
     scaled_alpha = raw.get("scaled_alpha", {}) or {}
     position_mapping = raw.get("position_mapping", {}) or {}
+    execution_realism = raw.get("execution_realism", {}) or {}
 
     default_symbols = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "LINK", "DOT", "LTC", "ATOM"]
     default_bars_per_day = int(ts_research.get("bars_per_day", 6))
@@ -279,5 +297,19 @@ def load_config(path: str | Path) -> RunConfig:
             min_annual_vol_floor=float(position_mapping.get("min_annual_vol_floor", 0.10)),
             one_way_cost_bps=float(position_mapping.get("one_way_cost_bps", 10.0)),
             annualization=int(position_mapping.get("annualization", default_annualization)),
+        ),
+        execution_realism=ExecutionRealismConfig(
+            output_dir=str(execution_realism.get("output_dir", "artifacts/execution_realism_4h")),
+            execution_lag_bars=int(execution_realism.get("execution_lag_bars", 1)),
+            delay_sensitivity_bars=[int(x) for x in execution_realism.get("delay_sensitivity_bars", [1, 2])],
+            base_one_way_cost_bps=float(execution_realism.get("base_one_way_cost_bps", 10.0)),
+            vol_cost_multiplier_bps=float(execution_realism.get("vol_cost_multiplier_bps", 5.0)),
+            turnover_cost_multiplier_bps=float(execution_realism.get("turnover_cost_multiplier_bps", 10.0)),
+            liquidity_cost_multiplier_bps=float(execution_realism.get("liquidity_cost_multiplier_bps", 5.0)),
+            vol_window=int(execution_realism.get("vol_window", 120)),
+            liquidity_column=str(execution_realism.get("liquidity_column", "amihud_120bar")),
+            annualization=int(execution_realism.get("annualization", default_annualization)),
+            strong_relative_return_floor=float(execution_realism.get("strong_relative_return_floor", 0.90)),
+            robust_relative_return_floor=float(execution_realism.get("robust_relative_return_floor", 0.80)),
         ),
     )

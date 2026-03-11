@@ -133,6 +133,55 @@ def _variant_summary(
     }
 
 
+def _paper_horse_race(variant_summary: pd.DataFrame) -> tuple[pd.DataFrame, str, str]:
+    anchor_variant = "linear_target_only"
+    anchor_row = variant_summary.loc[variant_summary["variant"] == anchor_variant].iloc[0]
+    rows: list[dict[str, object]] = []
+    for _, row in variant_summary.iterrows():
+        variant = str(row["variant"])
+        if variant == anchor_variant:
+            verdict = "anchor"
+        else:
+            strong_pass = (
+                float(row["sharpe"]) >= float(anchor_row["sharpe"])
+                and float(row["net_total_return"]) >= 0.90 * float(anchor_row["net_total_return"])
+                and float(row["mean_turnover"]) < float(anchor_row["mean_turnover"])
+                and float(row["cost_drag"]) < float(anchor_row["cost_drag"])
+            )
+            robust_pass = (
+                float(row["sharpe"]) > float(anchor_row["sharpe"])
+                and float(row["net_total_return"]) >= 0.80 * float(anchor_row["net_total_return"])
+                and float(row["realized_annual_vol"]) < float(anchor_row["realized_annual_vol"])
+                and float(row["cost_drag"]) < float(anchor_row["cost_drag"])
+            )
+            verdict = "strong_win" if strong_pass else "robust_win" if robust_pass else "fail"
+        rows.append(
+            {
+                **row.to_dict(),
+                "anchor_variant": anchor_variant,
+                "verdict": verdict,
+            }
+        )
+
+    horse_race = pd.DataFrame(rows)
+    strong_rows = horse_race.loc[horse_race["verdict"] == "strong_win"].sort_values(
+        ["sharpe", "net_total_return"], ascending=[False, False]
+    )
+    robust_rows = horse_race.loc[horse_race["verdict"] == "robust_win"].sort_values(
+        ["sharpe", "net_total_return"], ascending=[False, False]
+    )
+    if not strong_rows.empty:
+        winner_variant = str(strong_rows.iloc[0]["variant"])
+        winner_verdict = "strong_win"
+    elif not robust_rows.empty:
+        winner_variant = str(robust_rows.iloc[0]["variant"])
+        winner_verdict = "robust_win"
+    else:
+        winner_variant = anchor_variant
+        winner_verdict = "anchor_fallback"
+    return horse_race, winner_variant, winner_verdict
+
+
 def run_position_mapping(
     *,
     scaled_alpha_series: pd.DataFrame,
@@ -180,23 +229,9 @@ def run_position_mapping(
     variant_summary = pd.DataFrame(summaries).sort_values("variant").reset_index(drop=True)
     variant_summary.to_csv(target / "position_mapping_variant_summary.csv", index=False)
 
-    official_variant = "linear_band_vol_target"
-    official_row = variant_summary.loc[variant_summary["variant"] == official_variant].iloc[0]
-    linear_target_row = variant_summary.loc[variant_summary["variant"] == "linear_target_only"].iloc[0]
-
-    strong_pass = (
-        float(official_row["scaled_alpha_to_realized_corr"]) >= 0.85
-        and float(official_row["net_total_return"]) > 0.0
-        and float(official_row["sharpe"]) > 0.0
-        and float(official_row["realized_annual_vol"]) <= 1.20 * config.target_annual_vol
-        and float(official_row["mean_turnover"]) <= float(linear_target_row["mean_turnover"])
-    )
-    conditional_pass = (
-        float(official_row["scaled_alpha_to_realized_corr"]) >= 0.70
-        and float(official_row["net_total_return"]) > 0.0
-        and float(official_row["realized_annual_vol"]) <= 1.50 * config.target_annual_vol
-    )
-    verdict = "strong_pass" if strong_pass else "conditional_pass" if conditional_pass else "fail"
+    horse_race, official_variant, winner_verdict = _paper_horse_race(variant_summary)
+    horse_race.to_csv(target / "position_mapping_horse_race.csv", index=False)
+    official_row = horse_race.loc[horse_race["variant"] == official_variant].iloc[0]
 
     summary = pd.DataFrame(
         [
@@ -209,7 +244,7 @@ def run_position_mapping(
                 "target_annual_vol": config.target_annual_vol,
                 "min_annual_vol_floor": config.min_annual_vol_floor,
                 "one_way_cost_bps": config.one_way_cost_bps,
-                "verdict": verdict,
+                "winner_verdict": winner_verdict,
             }
         ]
     )
@@ -220,8 +255,9 @@ def run_position_mapping(
             "# Position Mapping Decision Log",
             "",
             f"- source_name: `{source_name}`",
-            f"- official_variant: `{official_variant}`",
-            f"- verdict: `{verdict}`",
+            "- anchor_variant: `linear_target_only`",
+            f"- paper_winner_variant: `{official_variant}`",
+            f"- paper_winner_verdict: `{winner_verdict}`",
             f"- scaled_alpha_to_realized_corr: `{float(official_row['scaled_alpha_to_realized_corr']):.4f}`",
             f"- net_total_return: `{float(official_row['net_total_return']):.6f}`",
             f"- sharpe: `{float(official_row['sharpe']):.4f}`",
@@ -236,8 +272,9 @@ def run_position_mapping(
     return {
         "series": series,
         "variant_summary": variant_summary,
+        "horse_race": horse_race,
         "summary": summary,
         "source_name": source_name,
         "variant": official_variant,
-        "verdict": verdict,
+        "verdict": winner_verdict,
     }

@@ -63,6 +63,7 @@ def run_alpha_research_4h_command(config_path: str, output_dir: str | None, line
         composite_experiment_config=config.composite_experiment,
         scaled_alpha_config=config.scaled_alpha,
         position_mapping_config=config.position_mapping,
+        execution_realism_config=config.execution_realism,
         output_dir=base_output,
         line=line,
     )
