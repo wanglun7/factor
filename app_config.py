@@ -113,6 +113,18 @@ class CompositeExperimentConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class ScaledAlphaConfig:
+    output_dir: str
+    primary_horizon: int
+    calibration_window: str
+    bucket_count: int
+    min_train_points: int
+    scale_quantile: float
+    clip_min: float
+    clip_max: float
+
+
+@dataclass(frozen=True, slots=True)
 class RunConfig:
     data: DataConfig
     ts_universe: TSUniverseConfig
@@ -121,6 +133,7 @@ class RunConfig:
     raw_generation: RawGenerationConfig
     score_admission: ScoreAdmissionConfig
     composite_experiment: CompositeExperimentConfig
+    scaled_alpha: ScaledAlphaConfig
 
 
 def _read_yaml(path: str | Path) -> dict[str, Any]:
@@ -139,6 +152,7 @@ def load_config(path: str | Path) -> RunConfig:
     rule = raw_generation.get("rule", raw.get("rule_generator", {}) or {}) or {}
     score_admission = raw.get("score_admission", raw.get("standardized_scores", {}) or {}) or {}
     composite_experiment = raw.get("composite_experiment", raw.get("composite_alpha", {}) or {}) or {}
+    scaled_alpha = raw.get("scaled_alpha", {}) or {}
 
     default_symbols = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "LINK", "DOT", "LTC", "ATOM"]
     default_bars_per_day = int(ts_research.get("bars_per_day", 6))
@@ -229,5 +243,15 @@ def load_config(path: str | Path) -> RunConfig:
             bootstrap_samples=int(composite_experiment.get("bootstrap_samples", 200)),
             bootstrap_seed=int(composite_experiment.get("bootstrap_seed", 7)),
             ic_weighted_subcomposite=bool(composite_experiment.get("ic_weighted_subcomposite", True)),
+        ),
+        scaled_alpha=ScaledAlphaConfig(
+            output_dir=str(scaled_alpha.get("output_dir", "artifacts/scaled_alpha_4h")),
+            primary_horizon=int(scaled_alpha.get("primary_horizon", composite_experiment.get("primary_horizon", ts_research.get("primary_horizon", 30)))),
+            calibration_window=str(scaled_alpha.get("calibration_window", "expanding")),
+            bucket_count=int(scaled_alpha.get("bucket_count", 5)),
+            min_train_points=int(scaled_alpha.get("min_train_points", 252)),
+            scale_quantile=float(scaled_alpha.get("scale_quantile", 0.95)),
+            clip_min=float(scaled_alpha.get("clip_min", -1.0)),
+            clip_max=float(scaled_alpha.get("clip_max", 1.0)),
         ),
     )

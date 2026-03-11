@@ -74,3 +74,12 @@ composite_experiment:
   bootstrap_samples: 200
   bootstrap_seed: 7
   ic_weighted_subcomposite: true
+scaled_alpha:
+  output_dir: artifacts/scaled_alpha_4h
+  primary_horizon: 30
+  calibration_window: expanding
+  bucket_count: 5
+  min_train_points: 252
+  scale_quantile: 0.95
+  clip_min: -1.0
+  clip_max: 1.0

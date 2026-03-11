@@ -61,6 +61,7 @@ def run_alpha_research_4h_command(config_path: str, output_dir: str | None, line
         raw_generation_config=config.raw_generation,
         score_admission_config=config.score_admission,
         composite_experiment_config=config.composite_experiment,
+        scaled_alpha_config=config.scaled_alpha,
         output_dir=base_output,
         line=line,
     )

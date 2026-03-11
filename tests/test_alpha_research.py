@@ -33,6 +33,7 @@ def test_alpha_research_4h_writes_unified_artifacts_and_admission_fields(tmp_pat
         raw_generation_config=config.raw_generation,
         score_admission_config=config.score_admission,
         composite_experiment_config=config.composite_experiment,
+        scaled_alpha_config=config.scaled_alpha,
         output_dir=tmp_path / "alpha_research_4h",
         line="both",
     )
@@ -47,6 +48,12 @@ def test_alpha_research_4h_writes_unified_artifacts_and_admission_fields(tmp_pat
     assert (out_dir / "composite_alpha_horse_race.csv").exists()
     assert (out_dir / "composite_alpha_panel.parquet").exists()
     assert (out_dir / "alpha_research_decision_log.md").exists()
+    assert (out_dir / "scaled_alpha_series.parquet").exists()
+    assert (out_dir / "scaled_alpha_summary.csv").exists()
+    assert (out_dir / "scaled_alpha_decision_log.md").exists()
+    assert (out_dir / "scaled_alpha_evaluation.csv").exists()
+    assert (out_dir / "scaled_alpha_bucket_diagnostics.csv").exists()
+    assert (out_dir / "scaled_alpha_evaluation_log.md").exists()
 
     score_summary = pd.read_csv(out_dir / "standardized_score_summary.csv")
     assert {
@@ -65,3 +72,28 @@ def test_alpha_research_4h_writes_unified_artifacts_and_admission_fields(tmp_pat
     assert "anchor" in set(horse_race["object_type"])
     assert "diagnostic_full_composite" in set(horse_race["object_type"])
     assert report["official_output_name"]
+    assert report["scaled_alpha_source_name"] == report["official_output_name"]
+    assert report["scaled_alpha_verdict"] in {"strong_pass", "conditional_pass", "fail"}
+
+    scaled_summary = pd.read_csv(out_dir / "scaled_alpha_summary.csv")
+    assert {"source_name", "coverage_ratio", "scaled_alpha_clip_rate"}.issubset(scaled_summary.columns)
+    assert scaled_summary.loc[0, "source_name"] == report["official_output_name"]
+
+    scaled_eval = pd.read_csv(out_dir / "scaled_alpha_evaluation.csv")
+    assert {
+        "verdict",
+        "scaled_alpha_rank_metric",
+        "composite_to_scaled_rank_retention",
+        "forecast_bucket_monotonicity",
+        "bounded_output_ok",
+        "min_live_coverage_ok",
+    }.issubset(scaled_eval.columns)
+    assert scaled_eval.loc[0, "verdict"] == report["scaled_alpha_verdict"]
+
+    scaled_series = pd.read_parquet(out_dir / "scaled_alpha_series.parquet")
+    assert {"composite_score", "forecast_return_30bar", "scaled_alpha"}.issubset(scaled_series.columns)
+    valid_scaled = scaled_series["scaled_alpha"].dropna()
+    assert valid_scaled.empty or ((valid_scaled >= -1.0) & (valid_scaled <= 1.0)).all()
+
+    bucket_diag = pd.read_csv(out_dir / "scaled_alpha_bucket_diagnostics.csv")
+    assert {"bucket", "sample_count", "mean_forward_return", "mean_value"}.issubset(bucket_diag.columns)

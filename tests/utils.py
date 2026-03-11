@@ -12,6 +12,7 @@ from app_config import (
     RuleGeneratorConfig,
     RunConfig,
     ScoreAdmissionConfig,
+    ScaledAlphaConfig,
     TSBacktestConfig,
     TSResearchConfig,
     TSUniverseConfig,
@@ -195,5 +196,15 @@ def make_config(root: Path) -> RunConfig:
             bootstrap_samples=40,
             bootstrap_seed=config.composite_experiment.bootstrap_seed,
             ic_weighted_subcomposite=config.composite_experiment.ic_weighted_subcomposite,
+        ),
+        scaled_alpha=ScaledAlphaConfig(
+            output_dir=config.scaled_alpha.output_dir,
+            primary_horizon=config.scaled_alpha.primary_horizon,
+            calibration_window=config.scaled_alpha.calibration_window,
+            bucket_count=config.scaled_alpha.bucket_count,
+            min_train_points=60,
+            scale_quantile=config.scaled_alpha.scale_quantile,
+            clip_min=config.scaled_alpha.clip_min,
+            clip_max=config.scaled_alpha.clip_max,
         ),
     )

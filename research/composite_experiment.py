@@ -359,6 +359,7 @@ def run_composite_experiment(
     return {
         "horse_race": horse_race,
         "pruning": pruning,
+        "panel": panel_out,
         "anchor_name": anchor_name,
         "official_output_name": official_name,
         "official_output_verdict": official_verdict,

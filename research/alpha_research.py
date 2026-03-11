@@ -4,10 +4,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from app_config import CompositeExperimentConfig, RawGenerationConfig, ScoreAdmissionConfig
+from app_config import CompositeExperimentConfig, RawGenerationConfig, ScaledAlphaConfig, ScoreAdmissionConfig
 from models import AlignedPanel
 from research.composite_experiment import run_composite_experiment
 from research.generated_raw import build_generated_raw, write_raw_artifacts
+from research.scaled_alpha import run_scaled_alpha
 from research.score_admission import run_score_admission
 
 
@@ -32,6 +33,7 @@ def run_alpha_research_4h(
     raw_generation_config: RawGenerationConfig,
     score_admission_config: ScoreAdmissionConfig,
     composite_experiment_config: CompositeExperimentConfig,
+    scaled_alpha_config: ScaledAlphaConfig,
     output_dir: str | Path,
     line: str = "both",
 ) -> dict[str, object]:
@@ -67,7 +69,19 @@ def run_alpha_research_4h(
         output_dir=target,
     )
     horse_race = composite_result["horse_race"]
+    composite_panel = composite_result["panel"]
     assert isinstance(horse_race, pd.DataFrame)
+    assert isinstance(composite_panel, pd.DataFrame)
+
+    scaled_alpha_result = run_scaled_alpha(
+        composite_panel=composite_panel,
+        official_output_name=str(composite_result["official_output_name"]),
+        base_price_frame=base_price_frame,
+        config=scaled_alpha_config,
+        output_dir=target,
+    )
+    scaled_alpha_summary = scaled_alpha_result["summary"]
+    assert isinstance(scaled_alpha_summary, pd.DataFrame)
 
     return {
         "state": "complete",
@@ -77,6 +91,8 @@ def run_alpha_research_4h(
         "anchor_name": composite_result["anchor_name"],
         "official_output_name": composite_result["official_output_name"],
         "official_output_verdict": composite_result["official_output_verdict"],
+        "scaled_alpha_source_name": scaled_alpha_result["source_name"],
+        "scaled_alpha_verdict": scaled_alpha_result["verdict"],
         "artifacts": {
             "raw_catalog": "generated_raw_predictor_catalog.csv",
             "raw_summary": "generated_raw_predictor_summary.csv",
@@ -87,5 +103,11 @@ def run_alpha_research_4h(
             "composite_horse_race": "composite_alpha_horse_race.csv",
             "composite_panel": "composite_alpha_panel.parquet",
             "decision_log": "alpha_research_decision_log.md",
+            "scaled_alpha_series": "scaled_alpha_series.parquet",
+            "scaled_alpha_summary": "scaled_alpha_summary.csv",
+            "scaled_alpha_decision_log": "scaled_alpha_decision_log.md",
+            "scaled_alpha_evaluation": "scaled_alpha_evaluation.csv",
+            "scaled_alpha_bucket_diagnostics": "scaled_alpha_bucket_diagnostics.csv",
+            "scaled_alpha_evaluation_log": "scaled_alpha_evaluation_log.md",
         },
     }
